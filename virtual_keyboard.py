@@ -3,10 +3,10 @@ import pygame
 
 # black background
 pygame.init()
+pygame.key.set_repeat(200,50)
 screen = pygame.display.set_mode((400, 300))
 
-r,g,b = 0,0,0
-selected = "r"
+color = (0,0,0)
 
 running=True
 clock =pygame.time.Clock()
@@ -17,32 +17,20 @@ while running:
             running = False
     
         elif event.type == pygame.KEYDOWN:
-            key = event.key 
+                if event.key == pygame.K_1:
+                    color = (255,0,0)
+                elif event.key == pygame.K_2:
+                    color = (0,255,0)
+                elif event.key == pygame.K_3:
+                    color = (0,0,255)
+                elif event.key == pygame.K_4:
+                    color = (255, 255, 0)
+                elif event.key == pygame.K_5:
+                    color = (255,255,255)
 
-            if key == pygame.K_r:
-                selected = "r"
-            elif key ==pygame.K_g:
-                selected = "g"
-            elif key == pygame.K_b:
-                selected = "b"
+              
 
-            elif event.key == pygame.K_UP:
-                if selected == "r":
-                    r = min(255, r + 5)
-                elif selected == "g":
-                    g = min(255, g +5)
-                elif selected == "b":
-                    b = min(255, b +5)
-
-            elif event.key == pygame.K_DOWN:
-                if selected == "r":
-                    r = max(0, r-5)
-                elif selected == "g":
-                    g=max(0, g - 5)
-                elif selected == "b":
-                    b = max(0, b - 5)
-
-    background_color = (r,g,b)
+    screen.fill(color)
     pygame.display.flip()
     clock.tick(60)
     
