@@ -1,10 +1,11 @@
 import math
 import pygame
+import random
 
 # black background
 pygame.init()
 pygame.key.set_repeat(200,50)
-screen = pygame.display.set_mode((400, 300))
+screen = pygame.display.set_mode((1280, 720))
 
 color = (0,0,0)
 
@@ -17,16 +18,11 @@ while running:
             running = False
     
         elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_1:
-                    color = (255,0,0)
-                elif event.key == pygame.K_2:
-                    color = (0,255,0)
-                elif event.key == pygame.K_3:
-                    color = (0,0,255)
-                elif event.key == pygame.K_4:
-                    color = (255, 255, 0)
-                elif event.key == pygame.K_5:
-                    color = (255,255,255)
+            color = ( 
+                random.randint(0,255),
+                random.randint(0,255),
+                random.randint(0,255)
+            )
 
               
 
