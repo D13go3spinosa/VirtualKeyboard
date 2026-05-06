@@ -29,10 +29,28 @@ class Particle:
         if self.life > 0:
             pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.radius)
 
-    
+class Voice: 
+    def __init__(self, freq):
+        self.freq=freq
+        self.phase = 0
+
+        self.env = 0.0
+        self.released = False
+    def release(self):
+        self.released = True  
+
+class OnePoleFilter:
+    def __init__(self):
+        self.prev=0
+    def process(self,x,cutoff = 0.08, resonance= 0.15):
+        y=np.zeros_like(x)
+        for i in range(len(x)):
+            self.prev = (cutoff * x[i] + (1- cutoff) * self.prev)
+            y[i] = self.prev +resonance * (x[i] - self.prev)
+        return y 
 
 sample_rate = 44100
-active_notes = {}
+voices={}
 lock = threading.Lock()
 
 keys = [
@@ -66,48 +84,53 @@ def low_pass(signal, alpha=0.12, resonance = 0.2):
     return filtered 
 
 
-
+filter_l= OnePoleFilter()
+filter_r= OnePoleFilter()
 
 def audio_callback(outdata, frames, time_info, status):
     t = np.arange(frames) / sample_rate
-    signal = np.zeros(frames)
+    mix = np.zeros(frames)
+
+    lfo = np.sin(2*np.pi*0.4*t)*0.003
     
     
     with lock:
-        notes = list(active_notes.values())
-    
-    attack = np.minimum(t * 10,1.0)
-    decay = np.exp(-t * 3)
-    envelope = attack * decay
+        voice_list = list(voices.values())
 
-    drift_lfo = np.sin(2* np.pi * 0.4 * t) * 0.003
-    
+    for v in voice_list:
+        freq = v.freq* (1+lfo)
 
-    for freq in notes:
-       
-       f = freq * (1 +drift_lfo)
-       
-       saw = 2*(t * f - np.floor(0.5 + t * f))
-       
-       detune1 = 2 * (t * f* 1.01 - np.floor(0.5 + t * f * 1.01))
-       detune2 = 2 * (t * f* 0.99 - np.floor(0.5 + t * f * 0.99))
+        if not v.released:
+            v.env += 0.02
+        else:
+            v.env -= 0.02
 
-       voice = (saw + 0.5 * detune1 + 0.5 * detune2)/2
-       
-       signal += voice * envelope
-    
-    
-    if notes:
-        signal /= len(notes)
+        v.env = np.clip(v.env,0.0,0,1)
 
-    signal = low_pass(signal, alpha= 0.12)
+        phase_inc = 2 * np.pi * freq / sample_rate
+        wave=np.zeros(frames)
 
-    stereo = np.zeros((frames, 2))
-    stereo[:, 0] = signal
-    stereo[:, 1] = signal * 0.98
+        for i in range(frames):
+            v.phase += phase_inc
+            sine = np.sin(v.phase)
 
-    outdata[:] = stereo
+        saw = 2 *(t*freq - np.floor(0.5+t*freq))
+        wave[i] = 0.6 * sine + 0.4 *saw
 
+        mix += wave * v.env
+
+    if voice_list:
+        mix /= len(voices)
+
+    mix = low_pass(mix, alpha=0.12)
+
+    stereo = np.zeros((frames,2))
+    stereo[:,0] = mix
+    stereo[:,1] = mix
+
+    outdata[:]= stereo
+      
+   
 stream = sd.OutputStream(
         channels=2,
         callback= audio_callback,
@@ -116,9 +139,8 @@ stream = sd.OutputStream(
 stream.start()
 
 pygame.init()
-pygame.key.set_repeat(200,50)
 screen = pygame.display.set_mode((1280, 720))
-
+clock = pygame.time.Clock
 color = (0,0,0)
 
 running=True
@@ -132,7 +154,7 @@ while running:
         elif event.type == pygame.KEYDOWN:
             if event.key in key_map:
                 with lock:
-                    active_notes[event.key] = key_map[event.key]
+                    active_notes[event.key] = Voice(key_map[event.key])
             
             x = random.randint(100,1180)
             y= random.randint(100, 620)
@@ -145,7 +167,7 @@ while running:
         elif event.type == pygame.KEYUP:
             with lock:
                 if event.key in active_notes:
-                    del active_notes[event.key]
+                    active_notes[event.key].release()
 
             
     screen.fill((10,10,20))
