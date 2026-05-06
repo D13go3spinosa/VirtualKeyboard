@@ -4,6 +4,33 @@ import pygame
 import random
 import threading
 
+particles = []
+class Particle: 
+    def __init__(self,x,y):
+        self.x = x
+        self.y = y 
+        self.radius = random.randint(2,5)
+        self.color=(
+            random.randint(100, 255),
+            random.randint(100, 255),
+            random.randint(100, 255),
+        )
+        self.vel_x = random.uniform(-3,3)
+        self.vel_y = random.uniform(-3,3)
+        self.life = random.randint(30,60)
+
+    def update(self):
+        self.x += self.vel_x
+        self.y += self.vel_y 
+        self.vel_y += 0.05 
+        self.life -=1 
+    
+    def draw(self, screen):
+        if self.life > 0:
+            pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.radius)
+
+
+
 sample_rate = 44100
 active_notes = {}
 lock = threading.Lock()
@@ -27,14 +54,23 @@ for i, key in enumerate(keys):
     key_map[key] = freq
 
 def audio_callback(outdata, frames, time, status):
-    time = np.arange(frames) / sample_rate
+    t = np.arange(frames) / sample_rate
     signal = np.zeros(frames)
 
     with lock:
         notes = list(active_notes.values())
 
     for freq in notes:
-        signal += np.sin(2 * np.pi * freq * time)
+       saw = 2*(t * freq - np.floor(0.5 + t * freq))
+       
+       detune1 = 2 * (t * freq* 1.01 - np.floor(0.5+ t * freq * 1.01))
+       detune2 = 2 * (t * freq* 0.99 - np.floor(0.5+ t * freq * 0.99))
+
+       voice = saw + 0.5 * detune1 + 0.5 * detune2
+
+       envelope = np.linspace(1,0.2,frames)
+
+       signal += voice * envelope 
 
     if notes:
         signal /= len(notes)
@@ -47,9 +83,6 @@ stream = sd.OutputStream(
         samplerate=sample_rate,
         )
 stream.start()
-
-
-
 
 pygame.init()
 pygame.key.set_repeat(200,50)
@@ -66,25 +99,24 @@ while running:
             running = False
     
         elif event.type == pygame.KEYDOWN:
-            color = ( 
-                random.randint(0,255),
-                random.randint(0,255),
-                random.randint(0,255)
-            )
-
             if event.key in key_map:
                 with lock:
                     active_notes[event.key] = key_map[event.key]
+            
+            x = random.randint(100,1180)
+            y= random.randint(100, 620)
+            
+            for _ in range(30):
+                particles.append(Particle(x,y))
 
-        elif event.type == pygame.KEYUP:
-            with lock:
-                if event.key in active_notes:
-                    del active_notes[event.key]
-        
+            
+    screen.fill((10,10,20))
+    for particle in particles [:]:
+        particle.update()
+        particle.draw(screen)
 
-              
-
-    screen.fill(color)
+        if particle.life <=0:
+            particles.remove(particle)
     pygame.display.flip()
     clock.tick(60)
 stream.stop()    
