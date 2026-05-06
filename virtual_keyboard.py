@@ -1,8 +1,20 @@
-import math
+import sounddevice as sd
 import pygame
 import random
 
-# black background
+sample_rate = 44100
+active_notes = {}
+
+key_map = {
+    pygame.K_a: 261.63,
+    pygame.K_s: 293.66,
+    pygame.K_d: 329.63,
+    pygame.K_f: 349.23,
+    pygame.K_g: 392.00,
+    pygame.K_h: 440.00,
+    pygame.K_j: 493.88,
+}
+
 pygame.init()
 pygame.key.set_repeat(200,50)
 screen = pygame.display.set_mode((1280, 720))
