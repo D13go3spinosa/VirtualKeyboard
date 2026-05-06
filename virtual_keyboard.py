@@ -132,13 +132,7 @@ def audio_callback(outdata, frames, time_info, status):
     stereo[:,1] = filter_r.process(mix * 0.97)
 
     outdata[:]= stereo
-
-
-
-    
-    
       
-   
 stream = sd.OutputStream(
         channels=2,
         callback= audio_callback,
