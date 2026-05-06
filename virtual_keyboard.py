@@ -33,9 +33,9 @@ class Voice:
     def __init__(self, freq):
         self.freq=freq
         self.phase = 0
-
         self.env = 0.0
         self.released = False
+    
     def release(self):
         self.released = True  
 
@@ -91,44 +91,52 @@ def audio_callback(outdata, frames, time_info, status):
     t = np.arange(frames) / sample_rate
     mix = np.zeros(frames)
 
-    lfo = np.sin(2*np.pi*0.4*t)*0.003
     
     
     with lock:
         voice_list = list(voices.values())
+    
+    global_lfo = np.sin (2*np.pi*0.4*t)*0.002
+    for v in voice_list:
+        drift = np.sin(2*np.pi*0.25*t+v.phase*0.00001)*0.0015
+        freq= v.freq * (1.0+global_lfo+drift )
 
     for v in voice_list:
-        freq = v.freq* (1+lfo)
-
         if not v.released:
-            v.env += 0.02
+            v.env += (1.0 - v.env)*0.08
         else:
-            v.env -= 0.02
+            v.env *= 0.95
 
-        v.env = np.clip(v.env,0.0,0,1)
-
+        v.env = np.clip(v.env,0.0,1.0)
+        
+        freq = v.freq 
         phase_inc = 2 * np.pi * freq / sample_rate
-        wave=np.zeros(frames)
+        
+        wave=np.zeros(frames, dtype=np.float32)
 
         for i in range(frames):
             v.phase += phase_inc
             sine = np.sin(v.phase)
-
-        saw = 2 *(t*freq - np.floor(0.5+t*freq))
-        wave[i] = 0.6 * sine + 0.4 *saw
+            saw = 2.0 *((v.phase/(2*np.pi)) % 1.0)-1.0    
+            wave[i] = 0.5 * sine + 0.5 * saw
 
         mix += wave * v.env
 
-    if voice_list:
-        mix /= len(voices)
+    if len(voice_list)>0:
+        mix *= (1.0/len(voice_list))
 
-    mix = low_pass(mix, alpha=0.12)
+    mix *= 0.6
 
-    stereo = np.zeros((frames,2))
+    stereo = np.zeros((frames,2), dtype=np.float32)
     stereo[:,0] = mix
-    stereo[:,1] = mix
+    stereo[:,1] = filter_r.process(mix * 0.97)
 
     outdata[:]= stereo
+
+
+
+    
+    
       
    
 stream = sd.OutputStream(
@@ -140,7 +148,6 @@ stream.start()
 
 pygame.init()
 screen = pygame.display.set_mode((1280, 720))
-clock = pygame.time.Clock
 color = (0,0,0)
 
 running=True
@@ -154,20 +161,20 @@ while running:
         elif event.type == pygame.KEYDOWN:
             if event.key in key_map:
                 with lock:
-                    active_notes[event.key] = Voice(key_map[event.key])
+                    voices[event.key] = Voice(key_map[event.key])
             
             x = random.randint(100,1180)
             y= random.randint(100, 620)
             
-            note_count = len(active_notes)
+            note_count = len(voices)
             
             for _ in range(20 + note_count * 5):
                 particles.append(Particle(x,y))
 
         elif event.type == pygame.KEYUP:
             with lock:
-                if event.key in active_notes:
-                    active_notes[event.key].release()
+                if event.key in voices:
+                    voices[event.key].release()
 
             
     screen.fill((10,10,20))
