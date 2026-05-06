@@ -8,15 +8,24 @@ sample_rate = 44100
 active_notes = {}
 lock = threading.Lock()
 
-key_map = {
-    pygame.K_a: 261.63,
-    pygame.K_s: 293.66,
-    pygame.K_d: 329.63,
-    pygame.K_f: 349.23,
-    pygame.K_g: 392.00,
-    pygame.K_h: 440.00,
-    pygame.K_j: 493.88,
-}
+keys = [
+    pygame.K_z, pygame.K_x, pygame.K_c, pygame.K_v, pygame.K_b,
+    pygame.K_n, pygame.K_m,
+    pygame.K_COMMA, pygame.K_PERIOD, pygame.K_SLASH, 
+
+    pygame.K_a, pygame.K_s, pygame.K_d, pygame.K_f, pygame.K_g, 
+    pygame.K_h, pygame.K_j, pygame.K_k, pygame.K_l,
+
+    pygame.K_q, pygame.K_w, pygame.K_e, pygame.K_r, pygame.K_t, 
+    pygame.K_y, pygame.K_u, pygame.K_i, pygame.K_o, pygame.K_p
+]
+base_freq = 261.63
+
+key_map = {}
+for i, key in enumerate(keys):
+    freq = base_freq * (2 **(i / 12))
+    key_map[key] = freq
+
 def audio_callback(outdata, frames, time, status):
     time = np.arange(frames) / sample_rate
     signal = np.zeros(frames)
