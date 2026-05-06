@@ -132,7 +132,7 @@ def audio_callback(outdata, frames, time_info, status):
     stereo[:,1] = filter_r.process(mix * 0.97)
 
     outdata[:]= stereo
-      
+
 stream = sd.OutputStream(
         channels=2,
         callback= audio_callback,
@@ -141,7 +141,7 @@ stream = sd.OutputStream(
 stream.start()
 
 pygame.init()
-screen = pygame.display.set_mode((1280, 720))
+screen = pygame.display.set_mode((1920, 1080))
 color = (0,0,0)
 
 running=True
