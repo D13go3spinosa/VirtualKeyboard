@@ -29,7 +29,7 @@ class Particle:
         if self.life > 0:
             pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.radius)
 
-
+    
 
 sample_rate = 44100
 active_notes = {}
@@ -50,35 +50,66 @@ base_freq = 261.63
 
 key_map = {}
 for i, key in enumerate(keys):
-    freq = base_freq * (2 **(i / 12))
+    freq = base_freq * (2 **((i-12) / 12))
     key_map[key] = freq
 
-def audio_callback(outdata, frames, time, status):
+def low_pass(signal, alpha=0.12, resonance = 0.2):
+    filtered = np.zeros_like(signal)
+    filtered[0] = signal [0]
+                          
+    for i in range (1, len(signal)):
+        filtered[i] = (
+            alpha * signal[i] + (1-alpha) * filtered[i-1]
+            + resonance * (signal[i]- filtered[i-1])
+            )
+        
+    return filtered 
+
+
+
+
+def audio_callback(outdata, frames, time_info, status):
     t = np.arange(frames) / sample_rate
     signal = np.zeros(frames)
-
+    
+    
     with lock:
         notes = list(active_notes.values())
+    
+    attack = np.minimum(t * 10,1.0)
+    decay = np.exp(-t * 3)
+    envelope = attack * decay
+
+    drift_lfo = np.sin(2* np.pi * 0.4 * t) * 0.003
+    
 
     for freq in notes:
-       saw = 2*(t * freq - np.floor(0.5 + t * freq))
        
-       detune1 = 2 * (t * freq* 1.01 - np.floor(0.5+ t * freq * 1.01))
-       detune2 = 2 * (t * freq* 0.99 - np.floor(0.5+ t * freq * 0.99))
+       f = freq * (1 +drift_lfo)
+       
+       saw = 2*(t * f - np.floor(0.5 + t * f))
+       
+       detune1 = 2 * (t * f* 1.01 - np.floor(0.5 + t * f * 1.01))
+       detune2 = 2 * (t * f* 0.99 - np.floor(0.5 + t * f * 0.99))
 
-       voice = saw + 0.5 * detune1 + 0.5 * detune2
-
-       envelope = np.linspace(1,0.2,frames)
-
-       signal += voice * envelope 
-
+       voice = (saw + 0.5 * detune1 + 0.5 * detune2)/2
+       
+       signal += voice * envelope
+    
+    
     if notes:
         signal /= len(notes)
 
-    outdata[:] = signal.reshape(-1,1)
+    signal = low_pass(signal, alpha= 0.12)
+
+    stereo = np.zeros((frames, 2))
+    stereo[:, 0] = signal
+    stereo[:, 1] = signal * 0.98
+
+    outdata[:] = stereo
 
 stream = sd.OutputStream(
-        channels=1,
+        channels=2,
         callback= audio_callback,
         samplerate=sample_rate,
         )
@@ -106,8 +137,15 @@ while running:
             x = random.randint(100,1180)
             y= random.randint(100, 620)
             
-            for _ in range(30):
+            note_count = len(active_notes)
+            
+            for _ in range(20 + note_count * 5):
                 particles.append(Particle(x,y))
+
+        elif event.type == pygame.KEYUP:
+            with lock:
+                if event.key in active_notes:
+                    del active_notes[event.key]
 
             
     screen.fill((10,10,20))
